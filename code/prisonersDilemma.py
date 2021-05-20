@@ -3,6 +3,7 @@ import itertools
 import importlib
 import numpy as np
 import random
+import sys
 
 STRATEGY_FOLDER = "exampleStrats"
 RESULTS_FILE = "results.txt"
@@ -64,15 +65,24 @@ def tallyRoundScores(history):
     return scoreA/ROUND_LENGTH, scoreB/ROUND_LENGTH
     
 def outputRoundResults(f, pair, roundHistory, scoresA, scoresB):
+    command = f"convert -size {roundHistory.shape[1]*2}x32 xc:white"
     f.write(pair[0]+" (P1)  VS.  "+pair[1]+" (P2)\n")
     for p in range(2):
         for t in range(roundHistory.shape[1]):
             move = roundHistory[p,t]
-            f.write(moveLabels[move]+" ")
+            command += f" -fill {'green' if moveLabels[move] == 'C' else 'red'}"
+            command += f' -draw "rectangle {t*4},{p*4} {t*4+4},{p*4+4}"'
+            f.write(moveLabels[move]+"")
         f.write("\n")
     f.write("Final score for "+pair[0]+": "+str(scoresA)+"\n")
     f.write("Final score for "+pair[1]+": "+str(scoresB)+"\n")
     f.write("\n")
+    command += " -fill black -draw \"text 2,20'"
+    command += "Final score for "+pair[0]+": "+str(scoresA)+"'\" -draw \"text 2,30'"
+    command += "Final score for "+pair[1]+": "+str(scoresB)
+    command += f"'\" '{pair[0]}_vs_{pair[1]}.png'"
+    if f == sys.stdout:
+        os.system(command)
     
 def pad(stri, leng):
     result = stri
@@ -91,8 +101,13 @@ def runFullPairingTournament(inFolder, outFile):
             
     for strategy in STRATEGY_LIST:
         scoreKeeper[strategy] = 0
-        
-    f = open(outFile,"w+")
+    
+    f = sys.stdout#open(outFile,"w+")
+    avgHook = open("averageDataHook", "a")
+    if outFile == "avgTesting":
+        f = open("/dev/null", "w+")
+    else:
+        avgHook = open("/dev/null", "a")
     for pair in itertools.combinations(STRATEGY_LIST, r=2):
         roundHistory = runRound(pair)
         scoresA, scoresB = tallyRoundScores(roundHistory)
@@ -111,10 +126,13 @@ def runFullPairingTournament(inFolder, outFile):
         score = scoresNumpy[i]
         scorePer = score/(len(STRATEGY_LIST)-1)
         f.write("#"+str(rank+1)+": "+pad(STRATEGY_LIST[i]+":",16)+' %.3f'%score+'  (%.3f'%scorePer+" average)\n")
+        avgHook.write(STRATEGY_LIST[i]+"⁰"+scorePer.__repr__()+"\n")
         
     f.flush()
-    f.close()
-    print("Done with everything! Results file written to "+RESULTS_FILE)
+    avgHook.flush()
+    avgHook.close()
+    #f.close()
+    #print("Done with everything! Results file written to "+RESULTS_FILE)
     
-    
-runFullPairingTournament(STRATEGY_FOLDER, RESULTS_FILE)
+if __name__ == "__main__":
+    runFullPairingTournament(STRATEGY_FOLDER, RESULTS_FILE)
